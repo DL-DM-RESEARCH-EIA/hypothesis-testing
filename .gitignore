@@ -56,3 +56,6 @@ eft-vae/vae_outputs/
 #jet-cnn/
 #eft-dnn/
 #eft-vae/
+
+# Data in general
+**/Data/
