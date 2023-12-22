@@ -9,8 +9,7 @@ import seaborn as sns; sns.set(style="white", color_codes=True)
 data_dir = 'Data/'
 array_dir = 'bootstrap_arrays/'
 
-
-extension = '_1000_bootstraps'
+extension = '1004_bootstraps'
 
 # To load
 y_test_arr = np.load(array_dir + 'y_test_arr' + extension + '.npy')
@@ -35,7 +34,7 @@ top_probs_list = []
 qcd_probs_list = []
 for i, (predictions, y_test) in enumerate(zip(predictions_arr, y_test_arr)):
     #print("i",i)
-    y_top=predictions[:,1]
+    y_top=predictions
 
     #print("y_top",y_top)
     #print("y_test",y_test)
@@ -75,6 +74,8 @@ for i, (qcd_probs, top_probs) in enumerate(zip(qcd_probs_list, top_probs_list)):
     ax.set_title("QCD vs Top")
     ax.set_xlim()
 
+plt.savefig("boostrap_analysis_1004.png")
+
 
 # Same as above but not only for good scores
 qcd_pdf_list = []
@@ -83,7 +84,7 @@ score_list = score_arr.tolist()
 fig, ax = plt.subplots(1,1, figsize = (8,8))
 for i, (qcd_probs, top_probs, score) in enumerate(zip(qcd_probs_list, top_probs_list, score_list)):
     # Discard bad training
-    if score > 0.88:
+    if score > 0.925:
         print(i)
         qcd_pdf,qcd_bins,_ = ax.hist(qcd_probs, bins = np.linspace(0, max_bin, nbins), label = 'QCD', density = True, alpha = 0.5)
         top_pdf,top_bins,_ = ax.hist(top_probs, bins = np.linspace(0, max_bin, nbins), label = 'Top', density = True, alpha = 0.5)
@@ -134,6 +135,7 @@ fig, ax = plt.subplots(1,1, figsize = (8,8))
 ax.bar(qcd_bins_centered, average_qcd_pdf, yerr=std_qcd_pdf, width=np.diff(qcd_bins_centered)[0], label = 'Average QCD PDF', alpha = 0.7)
 ax.bar(top_bins_centered, average_top_pdf, yerr=std_top_pdf, width=np.diff(qcd_bins_centered)[0], label = 'Average Top PDF', alpha = 0.7)
 ax.legend()
+plt.savefig("boostrap_analysis_best_1001.png")
 
 # Hack the values back into prob values - I do this because the matplotlib bar chart looks a lot worse than the hist plot
 # Actually never mind it looks nice now
@@ -267,12 +269,13 @@ ax.legend()
 """
 
 # =============================== Save arrays ==================================
-"""
-np.savetxt("average_qcd_pdf_1000bootstraps_" + str(nbins) + "bins001.txt",average_qcd_pdf)
-np.savetxt("average_top_pdf_1000bootstraps_" + str(nbins) + "bins001.txt",average_top_pdf)
-np.savetxt("qcd_bins_centered_1000bootstraps_" + str(nbins) + "bins001.txt",qcd_bins_centered)
-np.savetxt("top_bins_centered_1000bootstraps_" + str(nbins) + "bins001.txt",top_bins_centered)
 
+np.savetxt("average_qcd_pdf_1004bootstraps_" + str(nbins) + "bins001.txt",average_qcd_pdf)
+np.savetxt("average_top_pdf_1004bootstraps_" + str(nbins) + "bins001.txt",average_top_pdf)
+np.savetxt("qcd_bins_centered_1004bootstraps_" + str(nbins) + "bins001.txt",qcd_bins_centered)
+np.savetxt("top_bins_centered_1004bootstraps_" + str(nbins) + "bins001.txt",top_bins_centered)
+
+"""
 np.savetxt("average_qcd_pdf_both_zp5smeared_1000bootstraps_" + str(nbins) + "bins001.txt",average_smeared_qcd_pdf)
 np.savetxt("average_top_pdf_both_zp5smeared_1000bootstraps_" + str(nbins) + "bins001.txt",average_smeared_top_pdf)
 np.savetxt("qcd_bins_centered_both_zp5smeared_1000bootstraps_" + str(nbins) + "bins001.txt",smeared_qcd_bins_centered)

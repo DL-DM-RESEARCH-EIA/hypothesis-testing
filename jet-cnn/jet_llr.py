@@ -26,6 +26,10 @@ import seaborn as sns; sns.set(style="white", color_codes=True)
 # =========================== Take in arguments ================================
 import argparse
 
+from matplotlib import rc
+rc('font', **{'family': 'serif', 'serif': ['Computer Modern'], "size":18})
+rc('text', usetex=True)
+
 parser = argparse.ArgumentParser(description='These are the arguments that will be passed to the script')
 
 parser.add_argument("--pcut",
@@ -56,14 +60,14 @@ print("Pcut = " + str(args.pcut) + "ntoys = " + str(args.ntoys) + ", extension n
 #top_sample = np.loadtxt("top.txt", unpack=True)
 #qcd_sample = np.loadtxt("qcd.txt", unpack=True)
 
-cnn_outputs = 'cnn_outputs/'
+cnn_outputs = './'
 
-top_reference_pdf = np.loadtxt(cnn_outputs + "average_top_pdf_1000bootstraps_100bins.txt", unpack=True) # This is not the prob values but rather the pdf
-qcd_reference_pdf = np.loadtxt(cnn_outputs + "average_qcd_pdf_1000bootstraps_100bins.txt", unpack=True) # This is not the prob values but rather the pdf
-top_bins_centered = np.loadtxt(cnn_outputs + "top_bins_centered_1000bootstraps_100bins.txt", unpack=True)
-qcd_bins_centered = np.loadtxt(cnn_outputs + "qcd_bins_centered_1000bootstraps_100bins.txt", unpack=True)
+top_reference_pdf = np.loadtxt(cnn_outputs + "average_top_pdf_1001bootstraps_100bins001.txt", unpack=True) # This is not the prob values but rather the pdf
+qcd_reference_pdf = np.loadtxt(cnn_outputs + "average_qcd_pdf_1001bootstraps_100bins001.txt", unpack=True) # This is not the prob values but rather the pdf
+top_bins_centered = np.loadtxt(cnn_outputs + "top_bins_centered_1001bootstraps_100bins001.txt", unpack=True)
+qcd_bins_centered = np.loadtxt(cnn_outputs + "qcd_bins_centered_1001bootstraps_100bins001.txt", unpack=True)
 
-extension = 'with_poisson_' + str(args.pcut) + 'Pcut_' + str(int(args.ntoys/1000)) + 'ktoys' + str(args.ext_num)
+extension = 'with_poisson_' + str(args.pcut) + 'Pcut_' + str(int(args.ntoys/1004)) + 'ktoys' + str(args.ext_num)
 plot_dir = 'test55Plots/' + extension + '/'
 array_dir = 'test55arrays/'
 fig_specification = ''
@@ -283,8 +287,25 @@ plt.savefig(plot_dir + "pdfs" + fig_specification + ".pdf")
 # Instead of all this, with bootstrapping pdfs already made, just do
 #top_cross_section = 0.137129 # Old
 #qcd_cross_section = 58.09545 # Old
-top_cross_section = 53.1684
-qcd_cross_section = 48829.2
+
+import pandas as pd
+
+path_to_xs="cross_section/data"
+
+columns1 = ["cross", "delta-xs", "mzp"]
+columns2 = ["cross", "delta-xs"]
+
+xs_signal = pd.read_csv(f"{path_to_xs}/data_signal_cln_kl_2.txt", names=columns1)
+xs_bkg = pd.read_csv(f"{path_to_xs}/data_background_cln.txt", names=columns2)
+
+signal_xs_df = xs_signal[xs_signal["mzp"] == 500]
+# sample from a poisson distribution sigma on  uncertainty
+xs_signal = float(signal_xs_df["cross"])
+# Bckg is a normal distribution
+xs_bkg = float(xs_bkg["cross"])
+
+top_cross_section = xs_signal # 53.1684
+qcd_cross_section = xs_bkg # 48829.2
 top_to_qcd_ratio = top_cross_section/qcd_cross_section
 #top_to_qcd_ratio = 0.0005
 
@@ -476,7 +497,7 @@ def get_nstdevs(alpha):
     # The function to solve for - this is the above equation rearranged
     # Max number of standard deviation to integrate up to (a number -> infity)
     # For some reason n ~> 10000 gives bad integration but 1000 is more than enough
-    n_max = 1000
+    n_max = 1004
     def func(n):
         integral,error = integrate.quad(integrand, n, n_max)
         return integral - alpha*np.sqrt(2.0*np.pi)
@@ -548,9 +569,12 @@ def plot_llr(LLRqcd, LLRtop, anomaly_type, N_toys, N_toy_events, prob_threshold)
     ax=fig.add_axes([0.13,0.14,0.8,0.8])
     min_llr = np.floor(min(np.min(LLRqcd), np.min(LLRtop)))
     max_llr = np.ceil(max(np.max(LLRqcd), np.max(LLRtop)))
-    nbins = 100
-    LLRtop_histo, LLRtop_bins, _ = ax.hist(LLRtop, bins=np.linspace(min_llr,max_llr,100),label='QCD + TOP', alpha = 0.7, color = 'C1')
-    LLRqcd_histo, LLRqcd_bins, _ = ax.hist(LLRqcd, bins=np.linspace(min_llr,max_llr,100),label='QCD',alpha = 0.7, color = 'C2')
+    n_bins = 40
+    nbins_top = n_bins
+    nbins_qcd = n_bins
+    LLRtop_histo, LLRtop_bins, _ = ax.hist(LLRtop, bins=np.linspace(min_llr,max_llr,n_bins),label='QCD + TOP', alpha = 0.7, color = 'C1')
+    LLRqcd_histo, LLRqcd_bins, _ = ax.hist(LLRqcd, bins=np.linspace(min_llr,max_llr,n_bins),label='QCD',alpha = 0.7, color = 'C2')
+
     # This requires centering the bins so that we can accurately fit a Gaussian
     LLRqcd_binscenters = np.array([0.5 * (LLRqcd_bins[i] + LLRqcd_bins[i+1]) for i in range(len(LLRqcd_bins)-1)])
     LLRtop_binscenters = np.array([0.5 * (LLRtop_bins[i] + LLRtop_bins[i+1]) for i in range(len(LLRtop_bins)-1)])
@@ -565,16 +589,20 @@ def plot_llr(LLRqcd, LLRtop, anomaly_type, N_toys, N_toy_events, prob_threshold)
     # Plot the Gaussian
     ax.plot(LLRqcd_binscenters, LLRqcd_gaus, 'C2')
     ax.plot(LLRtop_binscenters, LLRtop_gaus, 'C1')
-    ax.set_title(r'QCD vs QCD + Top, $P_\mathrm{cut}(\mathrm{top})$ = %s' % prob_threshold, fontsize=14)
+    ax.set_title(r'SM vs SM + BSM, $P_\mathrm{cut}(\mathrm{top})$ = %s' % prob_threshold, fontsize=18)
     #ax.set_title(r'QCD vs QCD + Top', fontsize=14)
     ax.set_xlabel(r'LLR')
     ax.set_ylabel(r'Frequency')
     l1=ax.legend(loc=1)
     l2=ax.legend([r"$N_\mathrm{qcd \: events} = %s$" "\n" "$N_\mathrm{top \: events} = %s$" % (N_toy_events[0],N_toy_events[1]-N_toy_events[0])],loc=2,handlelength=0,handletextpad=0)
     ax.add_artist(l1)
-    ax.set_xlabel('LLR',fontsize=14)
-    ax.set_ylabel('Frequency',fontsize=14)
-    plt.savefig(plot_dir + "QCD{}_LLR_{}toy_events".format(anomaly_type, N_toy_events) + fig_specification + ".pdf")
+    ax.set_xlabel('LLR',fontsize=16)
+    ax.set_ylabel('Frequency',fontsize=16)
+    # Hide the y ticks
+    ax.set_yticks([])
+    ax.tick_params(axis='x', labelsize=16)  # Set x ticks fontsize to 16
+
+    plt.savefig(plot_dir + "QCD{}_LLR_{}toy_events_m500_2".format(anomaly_type, N_toy_events) + fig_specification + ".pdf")
 
     return LLRqcd_histo, LLRqcd_bins, LLRtop_histo, LLRtop_bins
 
@@ -675,7 +703,7 @@ def run_toys_luminosity(luminosity, prob_threshold, qcd_cross_section, top_cross
         ax.set_xlabel(r'$P(\mathrm{Top})$')
         ax.set_title(r"QCD vs Top $P_\mathrm{cut}(\mathrm{Top}) = %s$" % prob_threshold)
         ax.set_xlim()
-        plt.savefig(plot_dir + "pdfs_with_pcut" + str(prob_threshold) + 'Pcut' + fig_specification + ".pdf")
+        plt.savefig(plot_dir + "pdfs_with_pcut" + str(prob_threshold) + 'Pcut' + fig_specification + "_m1500" + ".pdf")
 
 
     # Sample
@@ -801,7 +829,7 @@ N_toys = args.ntoys
 
 prob_threshold = args.pcut
 #luminosity_arr = np.linspace(0.01,10,11)
-luminosity_arr = np.linspace(2,2,1)
+luminosity_arr = np.array([5]) # np.linspace(2,2,1)
 nstdevs_list = []
 nstdevs_no_beta_list = []
 nstdevs_exact_list = []
@@ -817,16 +845,16 @@ for luminosity in luminosity_arr:
 nstdevs_arr = np.stack((nstdevs_list))
 nstdevs_no_beta_arr = np.stack((nstdevs_no_beta_list))
 nstdevs_exact_arr = np.stack((nstdevs_exact_list))
-np.savetxt(array_dir + 'testluminosityZvsNtop_arr' + extension + '.txt', luminosity_arr)
-np.savetxt(array_dir + 'testnstdevsZvsNtop_arr' + extension + '.txt', nstdevs_arr)
-np.savetxt(array_dir + 'testnstdevs_no_betaZvsNtop_arr' + extension + '.txt', nstdevs_no_beta_arr)
-np.savetxt(array_dir + 'testnstdevs_exactZvsNtop_arr' + extension + '.txt', nstdevs_exact_arr)
+np.savetxt(array_dir + 'testluminosityZvsNtop_arr' + extension + 'm500.txt', luminosity_arr)
+np.savetxt(array_dir + 'testnstdevsZvsNtop_arr' + extension + 'm500.txt', nstdevs_arr)
+np.savetxt(array_dir + 'testnstdevs_no_betaZvsNtop_arr' + extension + 'm500.txt', nstdevs_no_beta_arr)
+np.savetxt(array_dir + 'testnstdevs_exactZvsNtop_arr' + extension + 'm500.txt', nstdevs_exact_arr)
 
 # Load them in again
-luminosity_arr = np.loadtxt(array_dir + 'testluminosityZvsNtop_arr' + extension + '.txt')
-nstdevs_arr = np.loadtxt(array_dir + 'testnstdevsZvsNtop_arr' + extension + '.txt')
-nstdevs_no_beta_arr = np.loadtxt(array_dir + 'testnstdevs_no_betaZvsNtop_arr' + extension + '.txt')
-nstdevs_exact_arr = np.loadtxt(array_dir + 'testnstdevs_exactZvsNtop_arr' + extension + '.txt')
+luminosity_arr = np.loadtxt(array_dir + 'testluminosityZvsNtop_arr' + extension + 'm500.txt')
+nstdevs_arr = np.loadtxt(array_dir + 'testnstdevsZvsNtop_arr' + extension + 'm500.txt')
+nstdevs_no_beta_arr = np.loadtxt(array_dir + 'testnstdevs_no_betaZvsNtop_arr' + extension + 'm500.txt')
+nstdevs_exact_arr = np.loadtxt(array_dir + 'testnstdevs_exactZvsNtop_arr' + extension + 'm500.txt')
 
 """
 plt.figure()
