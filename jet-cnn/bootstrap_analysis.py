@@ -9,7 +9,8 @@ import seaborn as sns; sns.set(style="white", color_codes=True)
 data_dir = 'Data/'
 array_dir = 'bootstrap_arrays/'
 
-extension = '1004_bootstraps'
+number_bootstrap = 20
+extension = f'{number_bootstrap}_bootstraps'
 
 # To load
 y_test_arr = np.load(array_dir + 'y_test_arr' + extension + '.npy')
@@ -74,7 +75,7 @@ for i, (qcd_probs, top_probs) in enumerate(zip(qcd_probs_list, top_probs_list)):
     ax.set_title("QCD vs Top")
     ax.set_xlim()
 
-plt.savefig("boostrap_analysis_1004.png")
+plt.savefig(f"boostrap_analysis_{number_bootstrap}.png")
 
 
 # Same as above but not only for good scores
@@ -135,7 +136,7 @@ fig, ax = plt.subplots(1,1, figsize = (8,8))
 ax.bar(qcd_bins_centered, average_qcd_pdf, yerr=std_qcd_pdf, width=np.diff(qcd_bins_centered)[0], label = 'Average QCD PDF', alpha = 0.7)
 ax.bar(top_bins_centered, average_top_pdf, yerr=std_top_pdf, width=np.diff(qcd_bins_centered)[0], label = 'Average Top PDF', alpha = 0.7)
 ax.legend()
-plt.savefig("boostrap_analysis_best_1001.png")
+plt.savefig(f"boostrap_analysis_best_{number_bootstrap}.png")
 
 # Hack the values back into prob values - I do this because the matplotlib bar chart looks a lot worse than the hist plot
 # Actually never mind it looks nice now
@@ -270,10 +271,10 @@ ax.legend()
 
 # =============================== Save arrays ==================================
 
-np.savetxt("average_qcd_pdf_1004bootstraps_" + str(nbins) + "bins001.txt",average_qcd_pdf)
-np.savetxt("average_top_pdf_1004bootstraps_" + str(nbins) + "bins001.txt",average_top_pdf)
-np.savetxt("qcd_bins_centered_1004bootstraps_" + str(nbins) + "bins001.txt",qcd_bins_centered)
-np.savetxt("top_bins_centered_1004bootstraps_" + str(nbins) + "bins001.txt",top_bins_centered)
+np.savetxt(f"average_qcd_pdf_{number_bootstrap}bootstraps_" + str(nbins) + "bins001.txt",average_qcd_pdf)
+np.savetxt(f"average_top_pdf_{number_bootstrap}bootstraps_" + str(nbins) + "bins001.txt",average_top_pdf)
+np.savetxt(f"qcd_bins_centered_{number_bootstrap}bootstraps_" + str(nbins) + "bins001.txt",qcd_bins_centered)
+np.savetxt(f"top_bins_centered_{number_bootstrap}bootstraps_" + str(nbins) + "bins001.txt",top_bins_centered)
 
 """
 np.savetxt("average_qcd_pdf_both_zp5smeared_1000bootstraps_" + str(nbins) + "bins001.txt",average_smeared_qcd_pdf)

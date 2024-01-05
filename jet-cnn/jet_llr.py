@@ -60,12 +60,13 @@ print("Pcut = " + str(args.pcut) + "ntoys = " + str(args.ntoys) + ", extension n
 #top_sample = np.loadtxt("top.txt", unpack=True)
 #qcd_sample = np.loadtxt("qcd.txt", unpack=True)
 
-cnn_outputs = './'
+cnn_outputs = ''
+number_bootstrap = 20
 
-top_reference_pdf = np.loadtxt(cnn_outputs + "average_top_pdf_1001bootstraps_100bins001.txt", unpack=True) # This is not the prob values but rather the pdf
-qcd_reference_pdf = np.loadtxt(cnn_outputs + "average_qcd_pdf_1001bootstraps_100bins001.txt", unpack=True) # This is not the prob values but rather the pdf
-top_bins_centered = np.loadtxt(cnn_outputs + "top_bins_centered_1001bootstraps_100bins001.txt", unpack=True)
-qcd_bins_centered = np.loadtxt(cnn_outputs + "qcd_bins_centered_1001bootstraps_100bins001.txt", unpack=True)
+top_reference_pdf = np.loadtxt(cnn_outputs + f"average_top_pdf_{number_bootstrap}bootstraps_100bins001.txt", unpack=True) # This is not the prob values but rather the pdf
+qcd_reference_pdf = np.loadtxt(cnn_outputs + f"average_qcd_pdf_{number_bootstrap}bootstraps_100bins001.txt", unpack=True) # This is not the prob values but rather the pdf
+top_bins_centered = np.loadtxt(cnn_outputs + f"top_bins_centered_{number_bootstrap}bootstraps_100bins001.txt", unpack=True)
+qcd_bins_centered = np.loadtxt(cnn_outputs + f"qcd_bins_centered_{number_bootstrap}bootstraps_100bins001.txt", unpack=True)
 
 extension = 'with_poisson_' + str(args.pcut) + 'Pcut_' + str(int(args.ntoys/1004)) + 'ktoys' + str(args.ext_num)
 plot_dir = 'test55Plots/' + extension + '/'
@@ -289,26 +290,42 @@ plt.savefig(plot_dir + "pdfs" + fig_specification + ".pdf")
 #qcd_cross_section = 58.09545 # Old
 
 import pandas as pd
+from main_NNDM import *
 
-path_to_xs="cross_section/data"
+set_name = ["DUNE"]
+# file_path = 'Data/MLTrainData/DataframeDistributions/'
+# dict_constrained = {"mk1": 0.02514990210703923, "delta": 1.05,  "eps2": 1.4550810518824755e-08} # input
+# df_test  =  create_test_dataframe(file_path, dict_constrained)
 
-columns1 = ["cross", "delta-xs", "mzp"]
-columns2 = ["cross", "delta-xs"]
+if set_name[0] == "DUNE":
+    file_path = 'hypothesis-testing/jet-cnn/Data/MLTrainData/DataframeDistributions/'
+    dict_constrained = {"mk1": 0.02514990210703923, "delta": 1.05,  "eps2": 1.4550810518824755e-08} # input
+    df_test  =  create_test_dataframe(file_path, dict_constrained)
 
-xs_signal = pd.read_csv(f"{path_to_xs}/data_signal_cln_kl_2.txt", names=columns1)
-xs_bkg = pd.read_csv(f"{path_to_xs}/data_background_cln.txt", names=columns2)
+    top_cross_section = len(df_test[df_test == 1])
+    qcd_cross_section = len(df_test[df_test == 0]) 
 
-signal_xs_df = xs_signal[xs_signal["mzp"] == 500]
-# sample from a poisson distribution sigma on  uncertainty
-xs_signal = float(signal_xs_df["cross"])
-# Bckg is a normal distribution
-xs_bkg = float(xs_bkg["cross"])
 
-top_cross_section = xs_signal # 53.1684
-qcd_cross_section = xs_bkg # 48829.2
+elif set_name == "HEPMASS":
+    path_to_xs="cross_section/data"
+
+    columns1 = ["cross", "delta-xs", "mzp"]
+    columns2 = ["cross", "delta-xs"]
+
+    xs_signal = pd.read_csv(f"{path_to_xs}/data_signal_cln_kl_2.txt", names=columns1)
+    xs_bkg = pd.read_csv(f"{path_to_xs}/data_background_cln.txt", names=columns2)
+
+    signal_xs_df = xs_signal[xs_signal["mzp"] == 500]
+    # sample from a poisson distribution sigma on  uncertainty
+    xs_signal = float(signal_xs_df["cross"])
+    # Bckg is a normal distribution
+    xs_bkg = float(xs_bkg["cross"])
+
+    top_cross_section = xs_signal # 53.1684
+    qcd_cross_section = xs_bkg # 48829.2
+
 top_to_qcd_ratio = top_cross_section/qcd_cross_section
 #top_to_qcd_ratio = 0.0005
-
 mixed_reference_pdf = qcd_reference_pdf*qcd_cross_section/(qcd_cross_section + top_cross_section) + top_reference_pdf*top_cross_section/(qcd_cross_section + top_cross_section)
 
 # ================= Define some more fucntions that will be used ===============
@@ -829,7 +846,11 @@ N_toys = args.ntoys
 
 prob_threshold = args.pcut
 #luminosity_arr = np.linspace(0.01,10,11)
-luminosity_arr = np.array([5]) # np.linspace(2,2,1)
+if set_name[0] == 'HEPMASS':
+    luminosity_arr = np.array([5]) # np.linspace(2,2,1)
+elif set_name[0] == 'DUNE': 
+    luminosity_arr = np.array([1]) # np.linspace(2,2,1)
+
 nstdevs_list = []
 nstdevs_no_beta_list = []
 nstdevs_exact_list = []

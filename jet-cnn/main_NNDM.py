@@ -55,10 +55,15 @@ def apply_filter(conditions_met):
 
 def read_names_constrained(file_path, dict_constrained, ext=".lhe"):
     """Main function that uses helper functions to read files and apply constraints."""
+        
     if ext == ".lhe":
         files_lhe, param_dict = read_lhe_file(file_path)
     else:
         files_lhe, param_dict = read_other_file(file_path, ext=ext)
+    
+    if len(param_dict) == 0:
+        print(f"Please check that the file_path={file_path} or dict_constrained={dict_constrained} has sense in the context")
+        exit(0)
 
     conditions_met = check_conditions(param_dict, dict_constrained)
     values = apply_filter(conditions_met)
@@ -532,30 +537,33 @@ def sub_step10():
     save_dataframe(X_train, "df_train", dict_constrained, target_dir)
     save_dataframe(X_val, "df_val", dict_constrained, target_dir)
 
-# Create a function that creates a training dataset of a given size
 
-def create_training_dataframe(path, dict_constrained, n_data):
+# Create a function that creates a training dataset of a given size and the corresponding val dataframe, separation 
+#  in principle is of the same size as in the division before
+def create_dataset_dataframe_balanced(path, dict_constrained, n_data, dataset_type='df_train'):
+    """
+    Creates a dataset dataframe of a given size for training or validation.
+
+    :param path: The file path to the dataset.
+    :param dict_constrained: Dictionary with constraints to select the correct file.
+    :param n_data: The number of data points to sample.
+    :param dataset_type: The type of dataset to create ('df_train' or 'df_val').
+    :return: A dataframe sampled according to weights.
+    """
     files = read_names_constrained(path, dict_constrained, ext=".pkl")
-    df_train_path = find_string_with_substring(files, 'df_train')
-    df_train_df = pd.read_pickle(df_train_path)
+    df_path = find_string_with_substring(files, dataset_type)
+    df = pd.read_pickle(df_path)
 
-    df_signal = df_train_df[df_train_df['label'] == 1]
-    df_background = df_train_df[df_train_df['label'] == 0]
+    df_signal = df[df['label'] == 1]
+    df_background = df[df['label'] == 0]
 
-    # Calculate the number of samples to draw from each class
     n_samples_per_class = int(n_data / 2)
 
-    # Sample from each class with weights
     df_signal_sampled = df_signal.sample(n=n_samples_per_class, weights='weight', random_state=42, replace=True)
     df_background_sampled = df_background.sample(n=n_samples_per_class, weights='weight', random_state=42, replace=True)
 
-    # Combine the sampled data
     sampled_df = pd.concat([df_signal_sampled, df_background_sampled])
-
-    # Shuffle the combined dataframe if necessary
     sampled_df = sampled_df.sample(frac=1, random_state=42).reset_index(drop=True)
-
-    # Drop the 'path' and 'weight' columns if they exist
     sampled_df = sampled_df.drop(columns=['path', 'weight'], errors='ignore')
 
     return sampled_df
@@ -564,11 +572,21 @@ def sub_step11():
     file_path = 'Data/MLTrainData/TrainDataDist/'
     dict_constrained = {"mk1": 0.02514990210703923, "delta": 1.05,  "eps2": 1.4550810518824755e-08} # input
     n_data = 1e6
-    df_train  =  create_training_dataframe(file_path, dict_constrained, n_data)
-
+    df_train  =  create_dataset_dataframe_balanced(file_path, dict_constrained, n_data)
+    df_val = create_dataset_dataframe_balanced(file_path, dict_constrained, int(n_data * 0.2), dataset_type='df_val')
     # finally save it here
 
-    print(df_train['label'].value_counts())
+    base_dir = "Data"
+    target_dir = os.path.join(base_dir, "MLTrainData/TrainData/")
+
+    # Create the directory if it doesn't exist
+    os.makedirs(target_dir, exist_ok=True)
+
+    # Assuming df_back_train, df_back_test, df_signal_train, df_signal_test are defined
+    # Save the dataframes as pickle files in the new directory
+    save_dataframe(df_train, "train", dict_constrained, target_dir)
+    save_dataframe(df_val, "val", dict_constrained, target_dir)
+
 
 def mean_number_of_s_and_b(sample_file_info, mk1, eps2):
     columns2 = ['mChi2', 'mEta2', 'alphaD', 'eps', 'Lp', 'Lc',
@@ -601,7 +619,7 @@ def mean_number_of_s_and_b(sample_file_info, mk1, eps2):
     return n_signal, n_background
 
 def create_test_dataframe(path, dict_constrained):
-    df_test_path_back = "Data/MLTrainData/DataframeDistributions/df_back_test_PDF.pkl"
+    df_test_path_back = "hypothesis-testing/jet-cnn/Data/MLTrainData/DataframeDistributions/df_back_test_PDF.pkl"
     df_background = pd.read_pickle(df_test_path_back)
     print(df_background)
 
@@ -611,7 +629,7 @@ def create_test_dataframe(path, dict_constrained):
     df_signal = pd.read_pickle(df_test_path)
 
     # Find the data nearst to the eps and background
-    sample_file_info = 'Data/Signal/data_scan/run_3/out_scan_parcial.csv'
+    sample_file_info = 'hypothesis-testing/jet-cnn/Data/Signal/data_scan/run_3/out_scan_parcial.csv'
     n_s, n_b = mean_number_of_s_and_b(sample_file_info, dict_constrained['mk1'], dict_constrained['eps2'])
 
     # Sample from each class with weights
@@ -639,10 +657,16 @@ def sub_step12():
     dict_constrained = {"mk1": 0.02514990210703923, "delta": 1.05,  "eps2": 1.4550810518824755e-08} # input
     df_test  =  create_test_dataframe(file_path, dict_constrained)
 
-    # finally save it here
-    print(df_test)
+
+    base_dir = "Data"
+    target_dir = os.path.join(base_dir, "MLTrainData/TestData/")
+
+    # Create the directory if it doesn't exist
+    os.makedirs(target_dir, exist_ok=True)
+
+    # Assuming df_back_train, df_back_test, df_signal_train, df_signal_test are defined
+    # Save the dataframes as pickle files in the new directory
+    save_dataframe(df_test, "test", dict_constrained, target_dir)
 
 
-# measure_execution_time(sub_step9)
-# measure_execution_time(sub_step10)
-# measure_execution_time(sub_step12)
+# sub_step12()

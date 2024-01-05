@@ -14,11 +14,12 @@ import keras
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Dropout, Activation, Conv2D, MaxPooling2D
 from sklearn.model_selection import train_test_split
+from main_NNDM import *
+
 
 data_dir = 'Data/'
 # =========================== Take in arguments ================================
 import argparse
-
 
 
 import pandas as pd
@@ -26,65 +27,46 @@ import numpy as np
 import keras
 from numpy import expand_dims
 
-def prepare_data(file_path, mass_value, signal_label_threshold=1e-1, set_name='HEPMASS'):
+set_name = ['DUNE']
+
+# This is how the program will develop
+
+# In prepare data, set_name == "HEPMASS", proceed as already established
+# If set_name=="DUNE", then create the data to save on Data/MLTrainData/TrainData/
+#  based on the dict constrained.
+
+
+def prepare_data(file_path, dict_contrained, signal_label_threshold=1e-1, set_name='HEPMASS'):
     if set_name == 'HEPMASS':
-        prepare_data_HEPMASS(file_path, mass_value, signal_label_threshold=1e-1)     
+        mass_value = dict_constrained['mass_value']
+        prepare_data_HEPMASS(file_path, mass_value, signal_label_threshold=signal_label_threshold)     
     elif set_name == 'DUNE':
+        prepare_data_DUNE(file_path, dict_constrained, signal_label_threshold=signal_label_threshold)
 
+def prepare_data_DUNE(file_path, dict_constrained, signal_label_threshold=1e-1):
+    print("Preparing data to be written")
 
-def prepare_data_DUNE(file_path, mass_value, signal_label_threshold=1e-1):
-    print("Preparing data")
+    n_data = 1e6  # Set the size of your dataset
 
-    # Load and preprocess data
-    data = pd.read_csv(file_path)
-    data = data.astype({'# label': 'int32'})
-    data.rename(columns={"# label": "label"}, inplace=True)
-    background = data.loc[data.label == 0] 
-    signal = data.loc[data.label == 1]
-    selected_signal = signal.loc[abs(signal.mass - mass_value) < signal_label_threshold]
+    # Create balanced training and validation datasets
+    df_train = create_dataset_dataframe_balanced(file_path, dict_constrained, n_data, dataset_type='df_train')
+    df_val = create_dataset_dataframe_balanced(file_path, dict_constrained, int(n_data * 0.2), dataset_type='df_val')
 
-    values = ['f20', 'f21', 'f22', 'f23', 'f24', 'f25', 'f26']
+    # Here, apply any additional processing you need, for example:
+    # Filtering, feature engineering, scaling, etc.
 
-    # Loading input data
-    data0 = background[values].to_numpy()
-    data1 = selected_signal[values].to_numpy()
+    # Save the prepared datasets
+    base_dir = "hypothesis-testing/jet-cnn/Data"
+    target_dir_train = os.path.join(base_dir, "MLTrainData", "TrainData")
 
-    print("data0", data0.shape)
-    print("data1", data1.shape)
+    # Create the directories if they don't exist
+    os.makedirs(target_dir_train, exist_ok=True)
 
-    # Balancing the dataset
-    size_signal = min(len(data1), len(data0))
-    data0 = data0[:size_signal]
-    data1 = data1[:size_signal]
+    # Save the dataframes
+    save_dataframe(df_train, "train", dict_constrained, target_dir_train)
+    save_dataframe(df_val, "val", dict_constrained, target_dir_train)
 
-    print("data0", data0.shape)
-    print(f'We have {len(data0)} background events and {len(data1)} signal m={mass_value} events')
-
-    # Preparing objects and labels
-    x_data = np.concatenate((data0, data1))
-    y_data = np.array([0]*len(data0) + [1]*len(data1))
-
-    print("x_data shape", x_data.shape)
-    print("x_data shape before reshuffle", len(x_data))
-
-    # Shuffling the data
-    np.random.seed(0)  # for reproducibility
-    perm = np.random.permutation(y_data.shape[0])
-    x_data, y_data = x_data[perm], y_data[perm]
-
-    # Reshaping
-    x_data = np.stack(x_data)
-    x_data = expand_dims(x_data, axis=2)
-
-    # One-hot encoding
-    y_data = keras.utils.to_categorical(y_data, 2)
-
-    # Saving preprocessed data
-    np.save("prepped_x_data", x_data)
-    np.save("prepped_y_data", y_data)
-
-    print("Data preparation complete.")
-
+    return df_train, df_val
 
 
 def prepare_data_HEPMASS(file_path, mass_value, signal_label_threshold=1e-1):
@@ -174,29 +156,53 @@ print("Smear target = " + str(args.smear_target) + " sigma = " + str(smearing) +
 from skimage import filters
 
 # Preparing the data is very memory intensive and won't run on the sussex cluster in a batch so prepare it beforehand
-prep_data = "prepare"
+prep_data = "load"
 if prep_data == "prepare":
     # Usage
-    prepare_data('Data/all_train.csv', 1250)
 
+    if set_name[0] == 'HEPMASS': 
+        dict_constrained = {'mass_value': 1250}
+        path = 'Data/all_train.csv'
+        prepare_data('Data/all_train.csv', dict_constrained)
+    elif set_name[0] == 'DUNE':
+        # TODO make all the process to create the df separately, combined, then sampled
+        # DF of the data is assumed to aredy exist
+        file_path = "hypothesis-testing/jet-cnn/Data/MLTrainData/TrainDataDist/"
+        dict_constrained = {"mk1": 0.02514990210703923, "delta": 1.05,  "eps2": 1.4550810518824755e-08} # input
+        prepare_data_DUNE(file_path, dict_constrained)
 
 elif prep_data == "load":
     print("Loading data")
-    x_data = np.load("prepped_x_data.npy")
-    y_data = np.load("prepped_y_data.npy")
+    x_data, y_data = None, None
+    df_train, df_val = None, None
+    if set_name[0] == 'HEPMASS': 
+        x_data = np.load("prepped_x_data.npy")
+        y_data = np.load("prepped_y_data.npy")
+    elif set_name[0] == 'DUNE':
+        base_dir = "hypothesis-testing/jet-cnn/Data/MLTrainData/"
+        target_dir_train = "TrainData"
 
-# n_train = int(len(y_data) * 2 / 3 )
-#test_size = 1 - n_train/x_data.shape[0]
+        file_path_train = os.path.join(base_dir, "TrainData")
+        dict_constrained = {"mk1": 0.02514990210703923, "delta": 1.05,  "eps2": 1.4550810518824755e-08} # input
+
+        all_files_train = read_names_constrained(file_path_train, dict_constrained, ext='.pkl')
+
+        # Extract specific file paths
+        df_train_path = find_string_with_substring(all_files_train, 'train')
+        df_val_path = find_string_with_substring(all_files_train, 'val')
+
+        # Check if the files exist and then load them
+        if df_train_path and os.path.exists(df_train_path):
+            df_train = pd.read_pickle(df_train_path)
+        else:
+            raise FileNotFoundError("Training data file not found.")
+
+        if df_val_path and os.path.exists(df_val_path):
+            df_val = pd.read_pickle(df_val_path)
+        else:
+            raise FileNotFoundError("Validation data file not found.")
+
 test_size = 1/3
-#(x_train, x_test) = x_data[:n_train], x_data[n_train:]
-#(y_train, y_test) = y_data[:n_train], y_data[n_train:]
-
-#x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size=test_size, random_state=42)
-
-#print("x_train",x_train.shape)
-#print("y_train",y_train.shape)
-#print("x_test",x_test.shape)
-#print("y_test",y_test)
 
 def create_model():
     model_CBC = ctb.CatBoostClassifier(custom_loss=['Logloss', 'Accuracy'], metric_period=1)
@@ -214,8 +220,23 @@ for i in range(n_iterations):
     model_catboost = ctb.CatBoostClassifier(custom_loss=['Logloss', 'Accuracy'], metric_period=1)
     print("bootstrap iteration", i+1)
 
-    x_train, x_test, y_train, y_test = train_test_split(np.squeeze(x_data), np.squeeze(y_data), test_size=test_size)
+    # TODO 4: change the way this is read depending on the case
+    if set_name[0] == 'HEPMASS':
+        x_train, x_test, y_train, y_test = train_test_split(np.squeeze(x_data), np.squeeze(y_data), test_size=test_size)
+    if set_name[0] == 'DUNE':
+        y_train = df_train['label']
+        x_train = df_train.drop('label', axis=1)
 
+        y_test = df_val['label']
+        x_test = df_val.drop('label', axis=1)
+
+
+    # This is going back and forth, but it is made like this for the mean time for compatibility
+    #   for the code already written for HEPMASS
+    y_train = keras.utils.to_categorical(y_train, 2)
+    y_test = keras.utils.to_categorical(y_test, 2)
+
+    # correct size of data
     train_data = ctb.Pool(data=x_train, label=np.argmax(y_train, axis=1))
     valid_data = ctb.Pool(data=x_test, label=np.argmax(y_test, axis=1))
 
